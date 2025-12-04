@@ -1,47 +1,61 @@
 import express from "express";
 import multer from "multer";
 import cors from "cors";
+import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
-
-// Correction pour __dirname avec ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
-// Config de stockage pour les PDF dans /uploads
+// 📁 Dossier uploads
+const uploadFolder = "./uploads";
+if (!fs.existsSync(uploadFolder)) {
+    fs.mkdirSync(uploadFolder);
+}
+
+// 📄 Configuration multer (enregistrement des fichiers PDF)
 const storage = multer.diskStorage({
-  destination: "uploads/",
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  }
+    destination: (req, file, cb) => {
+        cb(null, uploadFolder);
+    },
+    filename: (req, file, cb) => {
+        const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, unique + ".pdf"); // 🔥 toujours PDF
+    },
 });
 
 const upload = multer({ storage });
 
-// Route d'upload : /upload
+// -----------------------------------------------------
+// 🔥 ROUTE D’UPLOAD DES PDF
+// -----------------------------------------------------
 app.post("/upload", upload.single("pdf"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "Aucun fichier reçu" });
-  }
+    if (!req.file) {
+        return res.status(400).json({ error: "Aucun fichier reçu" });
+    }
 
-  // URL publique du fichier
-  const fileUrl = `/uploads/${req.file.filename}`;
+    // URL publique générée automatiquement par Railway
+    const publicUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
 
-  res.json({
-    success: true,
-    message: "PDF uploadé avec succès",
-    fileUrl
-  });
+    console.log("📄 Nouveau PDF reçu :", publicUrl);
+
+    res.json({
+        success: true,
+        url: publicUrl,
+        filename: req.file.filename,
+    });
 });
 
-// Rendre les fichiers accessibles publiquement
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// -----------------------------------------------------
+// 🔥 Rendre les fichiers PDF accessibles publiquement
+// -----------------------------------------------------
+app.use("/uploads", express.static(path.resolve("uploads")));
 
+// -----------------------------------------------------
+// 🔥 Port Railway
+// -----------------------------------------------------
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
-  console.log(`🚀 Serveur en ligne sur le port ${PORT}`);
+    console.log("🚀 Serveur backend PDF opérationnel sur port", PORT);
 });
